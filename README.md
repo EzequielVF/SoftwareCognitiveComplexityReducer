@@ -28,3 +28,8 @@ R. Saborido, J. Ferrer, F. Chicano and E. Alba, "Automatizing Software Cognitive
 
 #### Open science
 The paper is open access and the full text is available at https://ieeexplore.ieee.org/document/9686676 
+
+### Software dependencies (used versions)
+- JDK 11
+- jGrapht-1.5.0
+- jHeaps-0.14
