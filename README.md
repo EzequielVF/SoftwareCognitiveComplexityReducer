@@ -7,7 +7,7 @@ Different cognitive complexity measures have been proposed to quantify the under
 
 In the paper [Automatizing Software Cognitive Complexity Reduction](https://ieeexplore.ieee.org/document/9686676), which is published in the IEEE Access journal, we model the cognitive complexity reduction of a method as an optimization problem where the search space contains all sequences of Extract Method refactoring opportunities.  We then propose a novel approach that searches for feasible code extractions allowing developers to apply them, all in an automated way. This will allow software developers to make informed decisions while reducing the complexity of their code. We have evaluated the proposed approach over 10 open-source software projects and was able to fix 78% of the 1,050 existing cognitive complexity issues reported by SonarQube.
 
-### Software projects under study
+#### Software projects under study
 In order to ease the replication of the study, next we show detailed information of the 10 open-source software projects used in our experiments.
 
 User | Repository | Commit | Project link
@@ -23,13 +23,16 @@ MOEAFramework | MOEAFramework | 223393fd | https://github.com/MOEAFramework/MOEA
 redis | jedis | cfc227f7 | https://github.com/redis/jedis
 telefonicaid | fiware-commons | f83b342 | https://github.com/telefonicaid/fiware-commons
 
+### Software
+The folder "source code" contains an Eclipse plug-in that processes Java projects in order to find sequences of extract method refactoring opportunities which reduce Cognitive Complexity of methods to (or below) a threshold (15). This Eclipse project can be imported to the workspace by importing the project as a "Plug-in and fragment". This is usually just clicking on "File -> Import -> Plug-in Development -> Plug-ins and Fragments" in the Eclipse IDE.
+
+#### Dependencies (used versions)
+- JDK 11
+- jGrapht-1.5.0
+- jHeaps-0.14
+
 ### How to cite this work
 R. Saborido, J. Ferrer, F. Chicano and E. Alba, "Automatizing Software Cognitive Complexity Reduction" in IEEE Access, vol. 10, pp. 11642-11656, 2022, doi: 10.1109/ACCESS.2022.3144743.
 
 #### Open science
 The paper is open access and the full text is available at https://ieeexplore.ieee.org/document/9686676 
-
-### Software dependencies (used versions)
-- JDK 11
-- jGrapht-1.5.0
-- jHeaps-0.14
