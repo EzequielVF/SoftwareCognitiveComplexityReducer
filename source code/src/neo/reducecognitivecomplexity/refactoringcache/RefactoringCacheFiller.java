@@ -1,13 +1,12 @@
-package neo.reducecognitivecomplexity.algorithms.exhaustivesearch;
+package neo.reducecognitivecomplexity.refactoringcache;
 
 import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.EmptyStatement;
 
 import neo.reducecognitivecomplexity.Constants;
-import neo.reducecognitivecomplexity.algorithms.RefactoringCache;
 import neo.reducecognitivecomplexity.algorithms.Sequence;
-import neo.reducecognitivecomplexity.algorithms.exhaustivesearch.ConsecutiveSequenceIterator.SentenceSequenceInfo;
 import neo.reducecognitivecomplexity.jdt.CodeExtractionMetrics;
+import neo.reducecognitivecomplexity.refactoringcache.ConsecutiveSequenceIterator.SentenceSequenceInfo;
 
 public class RefactoringCacheFiller {
 
@@ -34,7 +33,7 @@ public class RefactoringCacheFiller {
 					return false;
 				}
 				CodeExtractionMetrics cem = refactoringCache
-						.getMetrics(new Sequence(sentences.getSiblingNodes().subList(from - 1, to)));
+						.getMetrics(new Sequence(refactoringCache.getCompilationUnit(), sentences.getSiblingNodes().subList(from - 1, to)));
 				return cem.isFeasible();
 			}
 
@@ -46,7 +45,7 @@ public class RefactoringCacheFiller {
 	}
 
 	public static void exhaustiveEnumerationAlgorithm(RefactoringCache refactoringCache, ASTNode method) {
-		SentencesSelectorVisitor sentencesSelectorVisitor = new SentencesSelectorVisitor();
+		SentencesSelectorVisitor sentencesSelectorVisitor = new SentencesSelectorVisitor(refactoringCache.getCompilationUnit());
 		method.accept(sentencesSelectorVisitor);
 
 		sentencesSelectorVisitor.getSentencesToIterate().stream()

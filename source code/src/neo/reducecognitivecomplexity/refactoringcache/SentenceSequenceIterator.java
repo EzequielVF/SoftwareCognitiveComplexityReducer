@@ -1,4 +1,4 @@
-package neo.reducecognitivecomplexity.algorithms.exhaustivesearch;
+package neo.reducecognitivecomplexity.refactoringcache;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -6,24 +6,26 @@ import java.util.List;
 import java.util.Stack;
 
 import org.eclipse.jdt.core.dom.ASTNode;
+import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.EmptyStatement;
 
 import neo.reducecognitivecomplexity.Constants;
 import neo.reducecognitivecomplexity.Utils;
-import neo.reducecognitivecomplexity.algorithms.RefactoringCache;
 import neo.reducecognitivecomplexity.algorithms.Sequence;
-import neo.reducecognitivecomplexity.algorithms.exhaustivesearch.ConsecutiveSequenceIterator.SentenceSequenceInfo;
 import neo.reducecognitivecomplexity.jdt.CodeExtractionMetrics;
+import neo.reducecognitivecomplexity.refactoringcache.ConsecutiveSequenceIterator.SentenceSequenceInfo;
 
 public class SentenceSequenceIterator implements Iterable<List<Sequence>> {
 	// TODO: efficiency
 
+	private CompilationUnit compilationUnit;
 	private Sequence sentences;
 	private ConsecutiveSequenceIterator csi;
 	private Iterable<List<Sequence>> iterable = null;
 
 	public SentenceSequenceIterator(Sequence sentences, RefactoringCache refactoringCache,
 			ConsecutiveSequenceIterator.APPROACH approach) {
+		this.compilationUnit = refactoringCache.getCompilationUnit();
 		this.sentences = sentences;
 		csi = new ConsecutiveSequenceIterator(new SentenceSequenceInfo() {
 			@Override
@@ -47,7 +49,7 @@ public class SentenceSequenceIterator implements Iterable<List<Sequence>> {
 					return false;
 				}
 				CodeExtractionMetrics cem = refactoringCache
-						.getMetrics(new Sequence(sentences.getSiblingNodes().subList(from - 1, to)));
+						.getMetrics(new Sequence(refactoringCache.getCompilationUnit(), sentences.getSiblingNodes().subList(from - 1, to)));
 				return cem.isFeasible();
 			}
 
@@ -70,7 +72,7 @@ public class SentenceSequenceIterator implements Iterable<List<Sequence>> {
 		for (int i = 0; i < stack.size(); i = i + 2) {
 			ArrayList<ASTNode> nodes = new ArrayList<>(
 					sentences.getSiblingNodes().subList(stack.get(i) - 1, stack.get(i + 1)));
-			result.add(new Sequence(nodes));
+			result.add(new Sequence(this.compilationUnit, nodes));
 		}
 		return result;
 	}

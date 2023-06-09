@@ -1,4 +1,4 @@
-package neo.reducecognitivecomplexity.algorithms.exhaustivesearch;
+package neo.reducecognitivecomplexity.refactoringcache;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -7,6 +7,7 @@ import java.util.List;
 import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.ASTVisitor;
 import org.eclipse.jdt.core.dom.Block;
+import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.Statement;
 import org.eclipse.jdt.core.dom.SwitchCase;
 import org.eclipse.jdt.core.dom.SwitchStatement;
@@ -14,11 +15,14 @@ import org.eclipse.jdt.core.dom.SwitchStatement;
 import neo.reducecognitivecomplexity.Constants;
 import neo.reducecognitivecomplexity.algorithms.Sequence;
 
-class SentencesSelectorVisitor extends ASTVisitor {
+public class SentencesSelectorVisitor extends ASTVisitor {
 
+	private CompilationUnit compilationUnit;
+	
 	private List<Sequence> sentencesToIterate;
 
-	public SentencesSelectorVisitor() {
+	public SentencesSelectorVisitor(CompilationUnit cu) {
+		compilationUnit = cu;
 		sentencesToIterate = new ArrayList<>();
 	}
 
@@ -26,7 +30,7 @@ class SentencesSelectorVisitor extends ASTVisitor {
 	public void preVisit(ASTNode node) {
 		if (node instanceof Block) {
 			Block block = (Block) node;
-			Sequence sequence = new Sequence((List<ASTNode>) block.statements());
+			Sequence sequence = new Sequence(this.compilationUnit, (List<ASTNode>) block.statements());
 			getSentencesToIterate().add(sequence);
 		} else if (node instanceof Statement) {
 			switch (node.getParent().getNodeType()) {
@@ -37,7 +41,7 @@ class SentencesSelectorVisitor extends ASTVisitor {
 			case ASTNode.WHILE_STATEMENT:
 				Integer acc = (Integer) node.getProperty(Constants.ACCUMULATED_COMPLEXITY);
 				if (acc != null && acc > 0) {
-					getSentencesToIterate().add(new Sequence(Arrays.asList(node)));
+					getSentencesToIterate().add(new Sequence(this.compilationUnit, Arrays.asList(node)));
 				}
 				break;
 			}
@@ -50,7 +54,7 @@ class SentencesSelectorVisitor extends ASTVisitor {
 			for (Statement stmt : (List<Statement>) sswitch.statements()) {
 				if (stmt instanceof SwitchCase) {
 					if (!currentBlock.isEmpty()) {
-						getSentencesToIterate().add(new Sequence(currentBlock));
+						getSentencesToIterate().add(new Sequence(this.compilationUnit,currentBlock));
 						currentBlock = new ArrayList<>();
 					}
 				} else {
@@ -58,7 +62,7 @@ class SentencesSelectorVisitor extends ASTVisitor {
 				}
 			}
 			if (!currentBlock.isEmpty()) {
-				getSentencesToIterate().add(new Sequence(currentBlock));
+				getSentencesToIterate().add(new Sequence(this.compilationUnit,currentBlock));
 			}
 		}
 

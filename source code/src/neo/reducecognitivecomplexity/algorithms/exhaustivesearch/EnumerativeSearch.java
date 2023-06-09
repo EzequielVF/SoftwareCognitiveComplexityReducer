@@ -8,9 +8,9 @@ import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 
 import neo.reducecognitivecomplexity.Constants;
-import neo.reducecognitivecomplexity.algorithms.RefactoringCache;
 import neo.reducecognitivecomplexity.algorithms.Solution;
-import neo.reducecognitivecomplexity.algorithms.exhaustivesearch.ConsecutiveSequenceIterator.APPROACH;
+import neo.reducecognitivecomplexity.refactoringcache.RefactoringCache;
+import neo.reducecognitivecomplexity.refactoringcache.ConsecutiveSequenceIterator.APPROACH;
 
 /**
  * Enumerative search for finding solutions ({@link Solution}) to reduce methods
@@ -20,7 +20,7 @@ public class EnumerativeSearch {
 	private Solution bestSolution;
 
 	public Solution run(APPROACH approach, BufferedWriter bf, String classWithIssues, CompilationUnit compilationUnit,
-			RefactoringCache refactoringCache, List<ASTNode> auxList, ASTNode ast, int methodComplexity)
+			RefactoringCache refactoringCache, long runtimeToFillRefactoringCache, List<ASTNode> auxList, ASTNode ast, int methodComplexity)
 			throws IOException {
 		bestSolution = null;
 		int optimo = 0;
@@ -65,6 +65,7 @@ public class EnumerativeSearch {
 		bf.append(bestSolution.getExtractionMetricsStats().getMeanReductionOfCognitiveComplexity() + ";");
 		bf.append(bestSolution.getExtractionMetricsStats().getTotalNumberOfReductionOfCognitiveComplexity() + ";");
 		bf.append("" + optimo + ";");
+		bf.append(Long.toString(runtimeToFillRefactoringCache) + ";");
 		bf.append(Long.toString(runtime) + "\n");
 
 		bf.flush();

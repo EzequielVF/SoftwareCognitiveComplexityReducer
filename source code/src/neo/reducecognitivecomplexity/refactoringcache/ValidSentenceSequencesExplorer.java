@@ -1,6 +1,6 @@
-package neo.reducecognitivecomplexity.algorithms.exhaustivesearch;
+package neo.reducecognitivecomplexity.refactoringcache;
 
-import neo.reducecognitivecomplexity.algorithms.exhaustivesearch.ConsecutiveSequenceIterator.SentenceSequenceInfo;
+import neo.reducecognitivecomplexity.refactoringcache.ConsecutiveSequenceIterator.SentenceSequenceInfo;
 
 public class ValidSentenceSequencesExplorer {
 

@@ -8,9 +8,11 @@ import java.util.stream.Collectors;
 
 import org.eclipse.jdt.core.dom.ASTNode;
 
-import neo.reducecognitivecomplexity.algorithms.RefactoringCache;
 import neo.reducecognitivecomplexity.algorithms.Sequence;
-import neo.reducecognitivecomplexity.algorithms.exhaustivesearch.ConsecutiveSequenceIterator.APPROACH;
+import neo.reducecognitivecomplexity.refactoringcache.RefactoringCache;
+import neo.reducecognitivecomplexity.refactoringcache.SentenceSequenceIterator;
+import neo.reducecognitivecomplexity.refactoringcache.SentencesSelectorVisitor;
+import neo.reducecognitivecomplexity.refactoringcache.ConsecutiveSequenceIterator.APPROACH;
 
 public class ExhaustiveEnumerationAlgorithm {
 	private ASTNode method;
@@ -22,7 +24,7 @@ public class ExhaustiveEnumerationAlgorithm {
 		this.refactoringCache = refactoringCache;
 		this.method = method;
 		this.approach = approach;
-		sentencesSelectorVisitor = new SentencesSelectorVisitor();
+		sentencesSelectorVisitor = new SentencesSelectorVisitor(refactoringCache.getCompilationUnit());
 		method.accept(sentencesSelectorVisitor);
 	}
 

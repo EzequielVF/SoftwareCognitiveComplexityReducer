@@ -1,4 +1,4 @@
-package neo.reducecognitivecomplexity.algorithms.exhaustivesearch;
+package neo.reducecognitivecomplexity.refactoringcache;
 
 import java.util.Stack;
 
