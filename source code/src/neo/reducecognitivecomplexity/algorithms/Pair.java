@@ -25,6 +25,14 @@ public class Pair implements Comparable<Pair> {
 	public Integer getB() {
 		return b;
 	}
+	
+	public void setA(Integer a) {
+		this.a = a;
+	}
+
+	public void setB(Integer b) {
+		this.b = b;
+	}
 
 	@Override
 	public int hashCode() {
@@ -143,16 +151,19 @@ public class Pair implements Comparable<Pair> {
 	public int compareTo(Pair q) {
 		int result;
 
+		// this is lower than q (return -1)
 		if (this.getA() < q.getA())
 			result = -1;
-		else if (this.getA() > q.getA())
+		else if (this.getA() > q.getA()) // this is greater than q (return 1)
 			result = 1;
-		else {
+		else { // this.getA() and q.getA() are equals
+			// we consider this greater than q when q contains this
 			if (this.getB() < q.getB())
-				result = -1;
-			else if (this.getB() > q.getB())
 				result = 1;
-			else
+			// we consider this lower than q when this contains q
+			else if (this.getB() > q.getB())
+				result = -1;
+			else // both are equals
 				result = 0;
 		}
 
