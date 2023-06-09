@@ -12,11 +12,11 @@
    </extension>
 
 	<extension
-         id="validation"
+         id="applyCodeExtractions"
          point="org.eclipse.core.runtime.applications">
          <application>
          <run
-               class="neo.reducecognitivecomplexity.Validation">
+               class="neo.reducecognitivecomplexity.ApplyCodeExtractions">
          </run>
          </application>
    </extension>
