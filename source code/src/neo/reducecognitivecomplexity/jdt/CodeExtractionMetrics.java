@@ -46,12 +46,15 @@ import org.eclipse.ltk.core.refactoring.Change;
  * 
  * <p>
  * {@code changes} Changes to apply (or applied) to extract code. The list
- * stores changes in the order they would be/were applied.
+ * stores changes in the order they would be/were applied. Usually, a code
+ * extraction involves just one change. We store this as a list to allow a
+ * sequence of code extractions.
  * 
  * <p>
  * {@code undoChanges} Changes to undo a extract method refactoring if the code
  * extraction was feasible and applied. The list stores undo changes in the
- * order they would be/were applied.
+ * order they would be/were applied. Usually, a code extraction involves just
+ * one change. We store this as a list to allow a sequence of code extractions.
  */
 public class CodeExtractionMetrics {
 	/**
@@ -107,14 +110,16 @@ public class CodeExtractionMetrics {
 
 	/**
 	 * Changes to apply (or applied) to extract code. The list stores changes in the
-	 * order they would be/were applied.
+	 * order they would be/were applied. Usually, a code extraction involves just
+	 * one change. We store this as a list to allow a sequence of code extractions.
 	 */
 	List<Change> changes = new ArrayList<Change>();
 
 	/**
 	 * Changes to undo a extract method refactoring if the code extraction was
 	 * feasible and applied. The list stores undo changes in the order they would
-	 * be/were applied.
+	 * be/were applied. Usually, a code extraction involves just
+	 * one change. We store this as a list to allow a sequence of code extractions.
 	 */
 	List<Change> undoChanges = new ArrayList<Change>();
 
@@ -127,11 +132,11 @@ public class CodeExtractionMetrics {
 		this.numberOfParametersInExtractedMethod = numberOfParametersInExtractedMethod;
 		this.changes = changes;
 		this.undoChanges = undoChanges;
-		this.reductionOfCognitiveComplexity = -1;
-		this.accumulatedInherentComponent = -1;
-		this.accumulatedNestingComponent = -1;
-		this.numberNestingContributors = -1;
-		this.nesting = -1;
+		this.reductionOfCognitiveComplexity = 0;
+		this.accumulatedInherentComponent = 0;
+		this.accumulatedNestingComponent = 0;
+		this.numberNestingContributors = 0;
+		this.nesting = 0;
 	}
 
 	public CodeExtractionMetrics(boolean feasible, String reason, boolean applied, int numberOfExtractedLinesOfCode,
@@ -152,6 +157,21 @@ public class CodeExtractionMetrics {
 		this.nesting = nesting;
 	}
 
+	public CodeExtractionMetrics(CodeExtractionMetrics metrics) {
+		this.feasible = metrics.feasible;
+		this.reason = metrics.reason;
+		this.applied = metrics.applied;
+		this.numberOfExtractedLinesOfCode = metrics.numberOfExtractedLinesOfCode;
+		this.numberOfParametersInExtractedMethod = metrics.numberOfParametersInExtractedMethod;
+		this.changes = new ArrayList<>(changes);
+		this.undoChanges = new ArrayList<>(undoChanges);
+		this.reductionOfCognitiveComplexity = metrics.reductionOfCognitiveComplexity;
+		this.accumulatedInherentComponent = metrics.accumulatedInherentComponent;
+		this.accumulatedNestingComponent = metrics.accumulatedNestingComponent;
+		this.numberNestingContributors = metrics.numberNestingContributors;
+		this.nesting = metrics.nesting;
+	}
+	
 	public void joinMetrics(CodeExtractionMetrics metrics) {
 		this.feasible = (this.feasible && metrics.isFeasible());
 		this.reason += "\n " + metrics.getReason();
@@ -161,10 +181,10 @@ public class CodeExtractionMetrics {
 		this.changes.addAll(metrics.getChanges());
 		this.undoChanges.addAll(metrics.getUndoChanges());
 		this.reductionOfCognitiveComplexity += metrics.reductionOfCognitiveComplexity;
-		this.accumulatedInherentComponent = -1;
-		this.accumulatedNestingComponent = -1;
-		this.numberNestingContributors = -1;
-		this.nesting = -1;
+		this.accumulatedInherentComponent = 0;
+		this.accumulatedNestingComponent = 0;
+		this.numberNestingContributors = 0;
+		this.nesting = 0;
 	}
 
 	public boolean isFeasible() {

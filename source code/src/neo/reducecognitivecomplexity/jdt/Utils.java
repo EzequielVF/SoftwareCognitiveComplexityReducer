@@ -1,10 +1,13 @@
 package neo.reducecognitivecomplexity.jdt;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.StringJoiner;
 import java.util.function.Predicate;
-
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IMarker;
 import org.eclipse.core.resources.IResource;
@@ -17,19 +20,27 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.core.runtime.Path;
 import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.JavaCore;
+import org.eclipse.jdt.core.compiler.IProblem;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.AnonymousClassDeclaration;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.IfStatement;
+import org.eclipse.jdt.core.dom.ImportDeclaration;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.core.dom.StructuralPropertyDescriptor;
 import org.eclipse.jdt.internal.corext.refactoring.code.ExtractMethodRefactoring;
+import org.eclipse.jdt.internal.corext.refactoring.structure.ChangeSignatureProcessor;
 import org.eclipse.ltk.core.refactoring.Change;
 import org.eclipse.ltk.core.refactoring.RefactoringStatus;
+import org.eclipse.ltk.core.refactoring.participants.CheckConditionsContext;
+import org.eclipse.ltk.core.refactoring.participants.ResourceChangeChecker;
+import org.eclipse.ltk.core.refactoring.participants.ValidateEditChecker;
 import org.eclipse.jdt.core.dom.SingleVariableDeclaration;
 
 import neo.reducecognitivecomplexity.Constants;
@@ -37,7 +48,6 @@ import neo.reducecognitivecomplexity.Constants;
 /**
  * Cognitive complexity utilities using JDT
  */
-@SuppressWarnings("restriction")
 public class Utils {
 	/**
 	 * Temporal name used by the oracle when testing if a code extraction into a new
@@ -67,6 +77,34 @@ public class Utils {
 
 		return astRoot;
 	}
+	
+	/**
+	 * Create a {@link org.eclipse.jdt.core.dom.CompilationUnit CompilationUnit}
+	 * from the path of a file in the system.
+	 * 
+	 * @param pathToFile absolute file path in the system.
+	 * @return The {@link org.eclipse.jdt.core.dom.CompilationUnit CompilationUnit}
+	 *         associated to the file or null if problems when reading giving file.
+	 */
+	public static CompilationUnit createCompilationUnitFromFile (String pathToFile) {
+		String sourceCode;
+		CompilationUnit astRoot = null;
+		
+		try {
+			sourceCode = new String(Files.readAllBytes(Paths.get(pathToFile)));
+			ASTParser parser = ASTParser.newParser(AST.getJLSLatest());
+			parser.setSource(sourceCode.toCharArray());
+			parser.setKind(ASTParser.K_COMPILATION_UNIT);
+
+			astRoot = (CompilationUnit) parser.createAST(null);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return astRoot;
+	}
+
 
 	/**
 	 * Check if a node can be extracted as a new method in the same compilation
@@ -141,6 +179,45 @@ public class Utils {
 
 		return result;
 	}
+	
+	/**
+	 * Get {@link org.eclipse.ltk.core.refactoring.Change Change} to apply to
+	 * refactor method name
+	 * 
+	 * @param node    The method to be refactored
+	 * @param newName The new name of the method
+	 * @return Null if the the refactor cannot be applied or the
+	 *         {@link org.eclipse.ltk.core.refactoring.Change Change} to be applied
+	 *         otherwise
+	 */
+	public static Change changeMethodName(MethodDeclaration node, String newName) {
+		ChangeSignatureProcessor changeSignatureProcessor = null;
+		Change change = null;
+		try {
+			changeSignatureProcessor = new ChangeSignatureProcessor((IMethod) node.resolveBinding().getJavaElement());
+
+			changeSignatureProcessor.setNewMethodName(newName);
+
+			CheckConditionsContext context = new CheckConditionsContext();
+			context.add(new ValidateEditChecker(null));
+			context.add(new ResourceChangeChecker());
+
+			IProgressMonitor monitor = new NullProgressMonitor();
+
+			RefactoringStatus status = changeSignatureProcessor.checkInitialConditions(monitor);
+			if (status.isOK()) {
+				status = changeSignatureProcessor.checkFinalConditions(monitor, context);
+				if (status.isOK()) {
+					change = changeSignatureProcessor.createChange(monitor);
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return change;
+	}
+
 
 	/**
 	 * Refactor a compilation unit extracting the given source code as a new method.
@@ -169,7 +246,7 @@ public class Utils {
 		IProgressMonitor npm = new NullProgressMonitor();
 		String resultOfRefactoring = new String("");
 		boolean compilationErrors = false;
-
+		
 		try {
 			// Create ExtractMethodRefactoring for a compilation unit
 			// For the selectionStart argument, the offset in the compilation unit must be
@@ -190,7 +267,7 @@ public class Utils {
 				// Check if code will be valid after applying the refactoring (it returns OK
 				// when it is feasible)
 				status = refactoring.checkFinalConditions(npm);
-
+				
 				// Check if refactoring satisfies final conditions
 				if (status.isOK()) {
 					resultOfRefactoring = "OK";
@@ -265,14 +342,29 @@ public class Utils {
 	 * @return true if the compilation unit has compilation errors.
 	 * @throws CoreException
 	 */
-	private static boolean builtWithCompilationErrors(CompilationUnit compilationUnit) throws CoreException {
+	public static boolean builtWithCompilationErrors(CompilationUnit compilationUnit) throws CoreException {
 		IProgressMonitor npm = new NullProgressMonitor();
-
-		compilationUnit.getJavaElement().getJavaProject().getProject()
-				.build(IncrementalProjectBuilder.INCREMENTAL_BUILD, npm);
-
-		return (IMarker.SEVERITY_ERROR == compilationUnit.getJavaElement().getResource()
-				.findMaxProblemSeverity(IMarker.PROBLEM, true, IResource.DEPTH_INFINITE));
+		boolean error = false;
+		IProblem problems[] = compilationUnit.getProblems();
+		
+		int index = 1;
+		while (!error && index <= problems.length)
+		{
+			error = problems[index-1].isError();
+			index++;
+		}
+		
+		return error;
+	}
+	
+	public static String getCompilationUnitProblems(CompilationUnit compilationUnit) {
+		StringJoiner result = new StringJoiner(System.lineSeparator());
+		
+		for (IProblem p : compilationUnit.getProblems()) {
+			result.add("Error? " + p.isError() + ": " + p.toString());
+		}
+		
+		return result.toString();
 	}
 
 	/**
@@ -534,7 +626,8 @@ public class Utils {
 
 		ASTNode parent = node.getParent();
 
-		while (parent != null && !(parent instanceof MethodDeclaration)) {
+		// Note that a method could declare more methods in an anonymous class. Skip those cases
+		while (parent != null && !(parent instanceof MethodDeclaration && !(parent.getParent() instanceof AnonymousClassDeclaration))) {
 
 			if (parent.getProperty(Constants.CONTRIBUTION_TO_COMPLEXITY) != null) {
 				ancestors.add(parent);
@@ -566,6 +659,31 @@ public class Utils {
 			c.add(node);
 		}
 	}
+	
+	/**
+	 * Get the method declaration associated to the given ASTNode
+	 * It assumes the given node belongs to a method declaration
+	 * If not, for instance when node is an import declaration,
+	 * this method will have an unexpected behavior
+	 * @return Node associated to the method declaration of the given node
+	 */
+	public static MethodDeclaration getMethodDeclaration(ASTNode node) {
+		ASTNode result=node;
+
+		while (!(result instanceof MethodDeclaration)) {
+			result = result.getParent();
+			
+			// A method could declare more methods in an anonymous class. Skip those cases
+			if (result instanceof MethodDeclaration)
+			{
+				if (result.getParent() instanceof AnonymousClassDeclaration) {
+					result = result.getParent();
+				}
+			}
+		}
+		
+		return (MethodDeclaration) result;
+	}
 
 	/**
 	 * Compute the nesting component of cognitive complexity of the given node
@@ -577,7 +695,9 @@ public class Utils {
 		int nesting = 0;
 		ASTNode current = node;
 		ASTNode child = null;
-		while (current != null && !(current instanceof MethodDeclaration)) {
+		ASTNode root = getMethodDeclaration(node);
+		
+		while (current != null && !(current.equals(root))) {
 			child = current;
 			current = current.getParent();
 
@@ -588,8 +708,13 @@ public class Utils {
 			case ASTNode.DO_STATEMENT:
 			case ASTNode.CATCH_CLAUSE:
 			case ASTNode.SWITCH_STATEMENT:
+			case ASTNode.LAMBDA_EXPRESSION:
 			case ASTNode.CONDITIONAL_EXPRESSION:
 				nesting++;
+				break;
+			case ASTNode.METHOD_DECLARATION:
+				if (!current.equals(root))
+					nesting++;
 				break;
 			case ASTNode.IF_STATEMENT:
 				if (child.getLocationInParent().equals(IfStatement.THEN_STATEMENT_PROPERTY)) {
@@ -599,6 +724,7 @@ public class Utils {
 						nesting++;
 					}
 				}
+				break;
 			}
 		}
 
@@ -701,11 +827,139 @@ public class Utils {
 	public ASTNode getAncestorContributingToComplexity(ASTNode node) {
 		ASTNode parent = node.getParent();
 
-		while (parent != null && !(parent instanceof MethodDeclaration)
+		// Note that a method could declare more methods in an anonymous class. Skip those cases
+		while (parent != null && !(parent instanceof MethodDeclaration && !(parent.getParent() instanceof AnonymousClassDeclaration))
 				&& parent.getProperty(Constants.CONTRIBUTION_TO_COMPLEXITY) == null) {
 			parent = parent.getParent();
 		}
 
 		return parent;
+	}
+	
+	/**
+	 * Instantiate a personalized node finder using the given root node, the given start and the given length.
+	 * The field {@code nodes} contains the sibling nodes in the code from the given start in the given length
+	 * 
+	 * @param root the given root node
+	 * @param start the given start
+	 * @param length the given length
+	 */
+	public static class NodeFinderVisitorForGivenSelection extends ASTVisitor {
+		private List<ASTNode> nodes;
+		private ASTNode parent;
+		private int fStart;
+		private int fEnd;
+		private ASTNode fCoveringNode;
+		private ASTNode fCoveredNode;
+
+		
+		public NodeFinderVisitorForGivenSelection(ASTNode root, int offset, int length) {
+			super(true); // include Javadoc tags
+			nodes = new ArrayList<ASTNode>();
+			this.fStart= offset;
+			this.fEnd= offset + length;
+			root.accept(this);
+		}
+
+		public List<ASTNode> getNodes() {
+			return nodes;
+		}
+		
+		@Override
+		public boolean preVisit2(ASTNode node) {
+			int nodeStart= node.getStartPosition();
+			int nodeEnd= nodeStart + node.getLength();
+			
+			if (this.fStart <= nodeStart && nodeEnd <= this.fEnd) {
+				if (nodes.isEmpty()) {
+					parent = node.getParent();
+					nodes.add(node);
+				}
+				else if (node.getParent() == parent) {
+					nodes.add(node);
+				}
+			}
+			
+			//The code below is the original code from NodeFinderVisitor
+			if (nodeEnd < this.fStart || this.fEnd < nodeStart) {
+				return false;
+			}
+			if (nodeStart <= this.fStart && this.fEnd <= nodeEnd) {
+				this.fCoveringNode= node;
+			}
+			if (this.fStart <= nodeStart && nodeEnd <= this.fEnd) {
+				if (this.fCoveringNode == node) { // nodeStart == fStart && nodeEnd == fEnd
+					this.fCoveredNode= node;
+					return true; // look further for node with same length as parent
+				} else if (this.fCoveredNode == null) { // no better found
+					this.fCoveredNode= node;
+				}
+				return false;
+			}
+			return true;
+		}
+	}
+	
+	/**
+	 * Visitor for a method declaration in the AST
+	 * @param methodLookingFor the name of the method to look for
+	 * @param methodParameters parameters of the method (its signature)
+	 * @param found true if the method declaration is in the AST
+	 * @param methodDeclaration the method declaration node in the AST if found
+	 */
+	public static class MethodDeclarationFinderVisitor extends ASTVisitor {
+		private String methodLookingFor;
+		private List<SingleVariableDeclaration> methodParameters;
+		private boolean found;
+		private MethodDeclaration methodDeclaration;
+
+		
+		public MethodDeclarationFinderVisitor(ASTNode root, String methodName, List<SingleVariableDeclaration> parameters) {
+			super(true); // include Javadoc tags
+			methodLookingFor = methodName;
+			methodParameters = parameters;
+			methodDeclaration = null;
+			found=false;
+			root.accept(this);
+		}
+		
+		public boolean found() {
+			return this.found;
+		}
+		
+		public MethodDeclaration getMethodDeclaration() {
+			return methodDeclaration;
+		}
+		
+		@Override
+		public boolean visit(MethodDeclaration method) {
+			if (method.getName().toString().compareTo(this.methodLookingFor)==0 &&
+				method.parameters().toString().equals(methodParameters.toString()))
+			{
+				methodDeclaration = method;
+				found = true;
+				return false;
+			}
+			else {
+				return true;
+			}
+		}
+	}
+
+	/**
+	 * Returns the length, in characters, of the import declaration on the given
+	 * compilation unit.
+	 * 
+	 * @param compilationUnit under processing
+	 * @return number of characters of the import declaration
+	 */
+	public static int lenghtImportDeclaration (CompilationUnit compilationUnit) {
+		int result = 0;
+		
+		for (Object importDeclaration : compilationUnit.imports()) {
+			result = result + ((ImportDeclaration) importDeclaration).getLength();
+		}
+		
+		return result;
 	}
 }
