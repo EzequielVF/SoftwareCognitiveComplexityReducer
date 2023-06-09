@@ -1,17 +1,19 @@
 package neo.reducecognitivecomplexity.graphs;
 
+import neo.reducecognitivecomplexity.algorithms.Pair;
+
 /**
  * This class models a vertex of graphs that contain information about cognitive
  * complexity
  */
-public class ExtractionVertex {
+public class ExtractionVertex implements Comparable {
 	private int initialOffset;
 	private int endOffset;
-	private int reductionOfCognitiveComplexity;
-	private int accumulatedInherentComponent;
-	private int accumulatedNestingComponent;
-	private int numberNestingContributors;
-	private int nesting;
+	private int reductionOfCognitiveComplexity; //reduction of CC when extracting this vertex
+	private int accumulatedInherentComponent; // accumulated inherent complexity of the current vertex and the ones contained by it
+	private int accumulatedNestingComponent; // accumulated nesting complexity of the vertices contained by this vertex. The current vertex has nesting component 0.
+	private int numberNestingContributors; // number of vertices that contribute to the nesting component of the current vertex (including itself when its nesting component is not 0)
+	private int nesting; //nesting level (starting in 0)
 
 	// Temporal values
 	private Integer temporalAccumulatedInherentComponent;
@@ -56,6 +58,14 @@ public class ExtractionVertex {
 			return temporalNumberNestingContributors;
 		}
 		return numberNestingContributors;
+	}
+	
+	public int getInitialOffset() {
+		return initialOffset;
+	}
+	
+	public int getEndOffset() {
+		return endOffset;
 	}
 
 	public void removeTemporalInformation() {
@@ -103,5 +113,13 @@ public class ExtractionVertex {
 
 	public int getNesting() {
 		return nesting;
+	}
+
+	@Override
+	public int compareTo(Object o) {
+		Pair a = new Pair(this.initialOffset, this.endOffset);
+		Pair b = new Pair(((ExtractionVertex)o).getInitialOffset(), ((ExtractionVertex)o).getEndOffset());
+		
+		return a.compareTo(b);
 	}
 }

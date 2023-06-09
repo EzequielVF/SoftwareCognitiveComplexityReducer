@@ -104,7 +104,7 @@ public class Utils {
 			}
 
 		} catch (NullPointerException e) {
-			LOGGER.severe("There was a fail processing the AST. Are the SONAR and Eclipse projects the same?");
+			LOGGER.severe("There was a fail processing the AST. Are the SONAR and Eclipse projects the same?\n" + compilationUnit.getJavaElement());
 			e.printStackTrace();
 		}
 
