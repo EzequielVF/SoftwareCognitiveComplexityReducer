@@ -15,20 +15,14 @@ import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.swt.widgets.Display;
-import org.jgrapht.graph.DefaultEdge;
-import org.jgrapht.graph.DefaultWeightedEdge;
-import org.jgrapht.graph.SimpleDirectedWeightedGraph;
-import org.jgrapht.graph.SimpleGraph;
-
 import com.google.gson.Gson;
 
-import neo.reducecognitivecomplexity.algorithms.RefactoringCache;
 import neo.reducecognitivecomplexity.algorithms.Solution;
 import neo.reducecognitivecomplexity.algorithms.exhaustivesearch.EnumerativeSearch;
-import neo.reducecognitivecomplexity.algorithms.exhaustivesearch.RefactoringCacheFiller;
-import neo.reducecognitivecomplexity.algorithms.exhaustivesearch.ConsecutiveSequenceIterator.APPROACH;
-import neo.reducecognitivecomplexity.graphs.ExtractionVertex;
 import neo.reducecognitivecomplexity.jdt.Utils;
+import neo.reducecognitivecomplexity.refactoringcache.RefactoringCache;
+import neo.reducecognitivecomplexity.refactoringcache.RefactoringCacheFiller;
+import neo.reducecognitivecomplexity.refactoringcache.ConsecutiveSequenceIterator.APPROACH;
 import neo.reducecognitivecomplexity.sonar.cognitivecomplexity.CognitiveComplexMethod;
 import neo.reducecognitivecomplexity.sonar.cognitivecomplexity.ProjectIssues;
 
@@ -36,8 +30,7 @@ import neo.reducecognitivecomplexity.sonar.cognitivecomplexity.ProjectIssues;
  * This is the main procedure of the Eclipse plug-in. The application has 6
  * arguments: (1) the URL of SonarQube, (2) the name of the SONAR project which
  * has been previously analyzed, (3) the token to use the SONAR API REST, (4)
- * the name of the Eclipse project in the Eclipse workspace, (5) the name of the
- * Eclipse project in the Eclipse workspace for validation, and (6) algorithm to
+ * the name of the Eclipse project in the Eclipse workspace, and (5) algorithm to
  * run for the search of refactoring opportunities.
  */
 public class Application implements IApplication {
@@ -45,10 +38,11 @@ public class Application implements IApplication {
 
 	@Override
 	public Object start(IApplicationContext arg) throws Exception {
-		Display.getDefault(); // This is required to work in OSX systems: the display must be created in the
-								// main thread
 
-		String sonarServer, projectNameInSonar, projectNameInWorkspace, projectNameInWorkspaceForValidation, token, uri;
+		Display.getDefault(); // This is required to work in OSX systems: the display must be created in the
+		// main thread
+
+		String sonarServer, projectNameInSonar, projectNameInWorkspace, token, uri;
 		String[] args = (String[]) arg.getArguments().get("application.args");
 
 		// Check the number of arguments given
@@ -62,19 +56,19 @@ public class Application implements IApplication {
 		projectNameInSonar = args[1];
 		token = args[2];
 		projectNameInWorkspace = args[3];
-		projectNameInWorkspaceForValidation = args[4];
-		String algorithmName = args[5];
+		String algorithmName = args[4];
 
 		try {
 			// creating and adding information to the results file
-			BufferedWriter bf = new BufferedWriter(
-					new FileWriter(Constants.OUTPUT_FOLDER + algorithmName + "-" + Constants.FILE, false));
+			BufferedWriter bf = new BufferedWriter(new FileWriter(Constants.OUTPUT_FOLDER
+					+ projectNameInWorkspace.replace('/', '.') + "-" + algorithmName + "-" + Constants.FILE, false));
 			bf.append("algorithm;class;method;initialComplexity;solution;extractions;fitness;"
 					+ "reductionComplexity;finalComplexity;"
 					+ "minExtractedLOC;maxExtractedLOC;meanExtractedLOC;totalExtractedLOC;"
 					+ "minParamsExtractedMethods;maxParamsExtractedMethods;meanParamsExtractedMethods;totalParamsExtractedMethods;"
-					+ "minReductionOfCC;maxReductionOfCC;meanReductionOfCC;totalReductionOfCC;" + "optimo;"
-					+ "executionTime;" + "\n");
+					+ "minReductionOfCC;maxReductionOfCC;meanReductionOfCC;totalReductionOfCC;" + "optimo;");
+			bf.append("runTimeToFillRefactoringCache;");
+			bf.append("executionTime\n");
 
 			// By default Sonar paginates queries to 100 elements per page. We have to
 			// paginate the content.
@@ -86,7 +80,9 @@ public class Application implements IApplication {
 				// Compose SONAR server URI
 				uri = neo.reducecognitivecomplexity.sonar.Utils.composeSonarUri(sonarServer, projectNameInSonar,
 						currentPage);
+
 				// Query cognitive complexity issues in project through the Sonar Web API
+				LOGGER.info("Querying complexy issues from Sonar: " + uri);
 				json = neo.reducecognitivecomplexity.sonar.Utils.GETRequest(uri, token);
 
 				// Parse json to get project issues
@@ -101,9 +97,10 @@ public class Application implements IApplication {
 						.getCognitiveComplexity(issues);
 
 				// Iterate over classes containing cognitive complex methods
+				int classWithIssuesCounter = 0;
 				LOGGER.info("#classes:" + methodsWithIssues.keySet().size());
 				for (String classWithIssues : methodsWithIssues.keySet()) {
-					LOGGER.info("Processing class '" + classWithIssues);
+					classWithIssuesCounter++;
 
 					// Get the relative path of current class in project in workspace
 					String relativePathForFileToProcess = projectNameInWorkspace + File.separator + classWithIssues;
@@ -119,32 +116,39 @@ public class Application implements IApplication {
 						LOGGER.warning("ERROR WITH COMPILATION UNIT: " + compilationUnit.getTypeRoot().toString());
 						LOGGER.warning(relativePathForFileToProcess);
 					} else {
+						int methodsWithIssuesInClassCounter = 0;
+
 						// Iterate over cognitive complex methods in current class
 						for (CognitiveComplexMethod complexMethod : methodsWithIssues.get(classWithIssues)) {
 							String methodName;
-							ExtractionVertex root;
+							methodsWithIssuesInClassCounter++;
 							RefactoringCache refactoringCache = new RefactoringCache(compilationUnit);
 							List<ASTNode> auxList = new ArrayList<ASTNode>();
-
+							
 							// Get AST of the method, including contribution to complexity reported by SONAR
-							ASTNode ast = neo.reducecognitivecomplexity.sonar.Utils
+							 ASTNode ast = neo.reducecognitivecomplexity.sonar.Utils
 									.getASTForMethodAnnotatingContributionToCognitiveComplexity(compilationUnit,
 											complexMethod, auxList);
+							
+							LOGGER.info("Processing class " + classWithIssuesCounter + " of "
+									+ methodsWithIssues.keySet().size() + " [" + currentPage + " (over "
+									+ totalPagesInSonar + " pages)");
+							LOGGER.info("Processing class '" + classWithIssues + "' ...");
 
 							// Get method name: this is the method name plus their signature
 							// joined by dashes. We do this because could exist several methods with similar
 							// names (but different signature)
 							methodName = ((MethodDeclaration) ast).getName().toString();
-							String composedMethodName = new String();
+
+							LOGGER.info("Processing method " + methodsWithIssuesInClassCounter + " of "
+									+ methodsWithIssues.get(classWithIssues).size());
+							LOGGER.info("Processing method '" + methodName + "' ...");
+							String composedMethodName = new String(methodName);
 							if ((((MethodDeclaration) ast).parameters() != null)
 									&& ((MethodDeclaration) ast).parameters().size() > 0) {
 								composedMethodName = methodName + "-"
 										+ String.join("-", Utils.getTypesInSignature((MethodDeclaration) ast));
 							}
-
-							LOGGER.info("Processing method '" + methodName + "' ...");
-							LOGGER.info("Composed method name: '" + composedMethodName + "'");
-
 							// We reduce composed method name length to avoid problems with the operative
 							// system
 							// replace special characters in composed method name
@@ -157,18 +161,14 @@ public class Application implements IApplication {
 							composedMethodName = composedMethodName.replace('*', '-');
 							composedMethodName = composedMethodName.replace('|', '-');
 							composedMethodName = composedMethodName.replace('"', '-');
+							LOGGER.info("Composed method name: '" + composedMethodName + "'");
 
 							// define path for output files
-							String fileNameForRefactoringCacheInfo = new String(
-									algorithmName + "-" + Constants.MAX_EVALS + "-" + classWithIssues.replace('/', '.')
-											+ "." + methodName + ".csv");
-							String fileNameForGraph = new String(algorithmName + "-" + Constants.MAX_EVALS + "-"
-									+ classWithIssues.replace('/', '.') + "." + methodName + ".dot");
-							String fileNameForGraphWithoutConflicts = new String(
-									algorithmName + "-" + Constants.MAX_EVALS + "-" + classWithIssues.replace('/', '.')
-											+ "." + methodName + ".no-conflicts.dot");
-							String fileNameForConflictGraph = new String(algorithmName + "-" + Constants.MAX_EVALS + "-"
-									+ classWithIssues.replace('/', '.') + "." + methodName + ".conflicts.dot");
+							String prefixForFileNames = projectNameInWorkspace.replace('/', '.') + "-" + algorithmName
+									+ "-" + classWithIssues.replace('/', '.') + "." + methodName;
+							String fileNameForRefactoringCacheInfo = new String(prefixForFileNames + ".csv");
+							String fileNameForSolution = new String(
+									Constants.OUTPUT_FOLDER + prefixForFileNames + ".solution.txt");
 
 							// Compute and annotate accumulated complexity in AST nodes
 							int methodComplexity = Utils
@@ -179,76 +179,45 @@ public class Application implements IApplication {
 
 							// Compute refactoring cache of current method
 							LOGGER.info("Computing refactoring cache ...");
+							long startTime = System.currentTimeMillis();
 							RefactoringCacheFiller.exhaustiveEnumerationAlgorithm(refactoringCache, ast);
+							long runtime = System.currentTimeMillis() - startTime;
+							LOGGER.info("Refactoring cache for method '" + methodName + "' succesfully generated in "
+									+ runtime + "ms.");
 							refactoringCache.writeToCSV(Constants.OUTPUT_FOLDER, fileNameForRefactoringCacheInfo);
 							LOGGER.info("Refactoring cache for method '" + methodName + "' succesfully generated in '"
 									+ fileNameForRefactoringCacheInfo + "'!");
 
-							// root extraction (information about the extraction of the entire body of the
-							// method)
-							root = new ExtractionVertex(((MethodDeclaration) ast).getStartPosition(),
-									((MethodDeclaration) ast).getLength()
-											+ ((MethodDeclaration) ast).getStartPosition(),
-									methodComplexity,
-									(int) ast.getProperty(Constants.ACCUMULATED_INHERENT_COMPLEXITY_COMPONENT),
-									(int) ast.getProperty(Constants.ACCUMULATED_NESTING_COMPLEXITY_COMPONENT),
-									(int) ast.getProperty(Constants.ACCUMULATED_NUMBER_NESTING_COMPLEXITY_CONTRIBUTORS),
-									0);
-
+							// Solve cognitive complexity reduction problem
+							LOGGER.info("Solving cognitive complexity reduction problem ...");
 							Solution solution = new Solution(compilationUnit, ast);
 							switch (algorithmName) {
 							case Constants.EXHAUSTIVE_SEARCH_LONG_SEQUENCES_FIRST:
 								solution = new EnumerativeSearch().run(APPROACH.LONG_SEQUENCE_FIRST, bf,
-										classWithIssues, compilationUnit, refactoringCache, auxList, ast,
+										classWithIssues, compilationUnit, refactoringCache, runtime, auxList, ast,
 										methodComplexity);
 								break;
 							case Constants.EXHAUSTIVE_SEARCH_SHORT_SEQUENCES_FIRST:
 								solution = new EnumerativeSearch().run(APPROACH.SHORT_SEQUENCE_FIRST, bf,
-										classWithIssues, compilationUnit, refactoringCache, auxList, ast,
+										classWithIssues, compilationUnit, refactoringCache, runtime, auxList, ast,
 										methodComplexity);
 								break;
 							default:
 								LOGGER.severe("No algorithm with name " + algorithmName);
 							}
-
-							LOGGER.info(solution.toString());
-							if (!solution.getSequenceList().isEmpty())
-								solutions.add(neo.reducecognitivecomplexity.sonar.Utils
-										.indexOfInsertionToKeepListSorted(solution, solutions), solution);
-
-							refactoringCache.writeToCSV(Constants.OUTPUT_FOLDER, fileNameForRefactoringCacheInfo);
-
-							SimpleGraph<ExtractionVertex, DefaultEdge> conflictsGraph = new SimpleGraph<>(
-									DefaultEdge.class);
-							SimpleDirectedWeightedGraph<ExtractionVertex, DefaultWeightedEdge> graphWithoutConflicts = new SimpleDirectedWeightedGraph<>(
-									DefaultWeightedEdge.class);
-
-							// Initialize graphs (the one including conflicts, the one excluding conflicts,
-							// and one just including conflicts)
-							SimpleDirectedWeightedGraph<ExtractionVertex, DefaultWeightedEdge> graph = refactoringCache
-									.getGraphOfFeasibleRefactorings(root, methodComplexity, graphWithoutConflicts,
-											conflictsGraph);
-
-							// render full graph
-							neo.reducecognitivecomplexity.graphs.Utils.renderGraphInDotFormatInFile(graph,
-									Constants.OUTPUT_FOLDER, fileNameForGraph);
-							neo.reducecognitivecomplexity.graphs.Utils.clear(graph);
-
-							// render graph without conflicts
-							neo.reducecognitivecomplexity.graphs.Utils.renderGraphInDotFormatInFile(
-									graphWithoutConflicts, Constants.OUTPUT_FOLDER, fileNameForGraphWithoutConflicts);
-							neo.reducecognitivecomplexity.graphs.Utils.clear(graphWithoutConflicts);
-
-							// render conflicts graph
-							neo.reducecognitivecomplexity.graphs.Utils.renderConflictGraphInDotFormatInFile(
-									conflictsGraph, Constants.OUTPUT_FOLDER, fileNameForConflictGraph);
-							neo.reducecognitivecomplexity.graphs.Utils.clear(conflictsGraph);
+							
+							if (solution != null) {
+								solution.writeInFile(fileNameForSolution);
+								LOGGER.info(solution.toString());
+								if (!solution.getSequenceList().isEmpty())
+									solutions.add(neo.reducecognitivecomplexity.sonar.Utils
+											.indexOfInsertionToKeepListSorted(solution, solutions), solution);
+							}
 						}
 					}
 
 					LOGGER.info("Refactoring operations to apply in class " + classWithIssues + ":\n" + solutions);
 				}
-
 				currentPage++;
 				allPagesProccessed = currentPage > totalPagesInSonar;
 			} // end while loop to paginating issues in Sonar
