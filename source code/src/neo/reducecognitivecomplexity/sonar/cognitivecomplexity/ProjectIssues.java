@@ -71,6 +71,10 @@ public class ProjectIssues {
 		this.issues = issues;
 	}
 
+	
+	//The list of issues for each class is in descending order
+	//Note that Sonar reports methods with issues in a class by the order of appearance in the code
+	//We intentionally store issues in descending order to apply refactoring in this order later to avoid problems with offsets
 	public static Map<String, List<CognitiveComplexMethod>> getCognitiveComplexity(ProjectIssues issues) {
 		int contributionValue;
 		int complexity, complexityThreshold;
