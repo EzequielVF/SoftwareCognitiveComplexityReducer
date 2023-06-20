@@ -5,7 +5,7 @@ package neo.reducecognitivecomplexity;
  */
 public class Constants {
 	public static final int MAX_COMPLEXITY = 15;
-	public static final int ARGS = 6;
+	public static final int ARGS = 5;
 	public static final String CONTRIBUTION_TO_COMPLEXITY = "contributionToComplexity";
 	public static final String ACCUMULATED_COMPLEXITY = "accumulatedComplexity";
 
