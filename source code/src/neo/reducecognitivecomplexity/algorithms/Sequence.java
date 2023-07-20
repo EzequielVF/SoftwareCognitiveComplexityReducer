@@ -32,7 +32,7 @@ public class Sequence {
 	/**
 	 * Create an empty Sequence for a given compilation unit
 	 * 
-	 * @param Compilation unit sibling nodes belongs to
+	 * @param compilationUnit Compilation unit sibling nodes belongs to
 	 */
 	public Sequence(CompilationUnit compilationUnit) {
 		this.siblingNodes = new ArrayList<ASTNode>();
@@ -40,10 +40,24 @@ public class Sequence {
 	}
 
 	/**
-	 * Create a Sequence for the given compilation unit from a given list of sibling nodes
+	 * Create a Sequence for the given compilation unit from a given {@link Pair}
 	 * 
-	 * @param Compilation unit sibling nodes belongs to
-	 * @param sibling nodes
+	 * @param compilationUnit Compilation unit {@link Pair} belongs to
+	 * @param pair {@link Pair} defining sibling nodes
+	 */
+	public Sequence(CompilationUnit compilationUnit, Pair pair) {
+		this.compilationUnit = compilationUnit;
+		
+		this.siblingNodes = new Utils.NodeFinderVisitorForGivenSelection(
+				compilationUnit.getRoot(), pair.getA().intValue(), pair.getB() - pair.getA())
+				.getNodes();
+	}
+	
+	/**
+	 * Create a Sequence for the given compilation unit from a given  list of sibling nodes
+	 * 
+	 * @param compilationUnit Compilation unit sibling nodes belongs to
+	 * @param siblingNodes sibling nodes
 	 */
 	public Sequence(CompilationUnit compilationUnit, List<ASTNode> siblingNodes) {
 		this.compilationUnit = compilationUnit;
@@ -84,7 +98,7 @@ public class Sequence {
 	 * provided {@link RefactoringCache}. Calls to this method are faster than
 	 * calling {@link evaluate(CompilationUnit compilationUnit)}.
 	 * 
-	 * @param rf
+	 * @param rf refactoring cache
 	 * @return Metrics of the code extraction associated to the Sequence.
 	 */
 	public CodeExtractionMetrics evaluate(RefactoringCache rf) {
