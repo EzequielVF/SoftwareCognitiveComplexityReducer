@@ -1,0 +1,14 @@
+# Ignore everything in this folder by default
+/*
+
+# Keep the .gitignore itself
+!/.gitignore
+
+# Allow only these items at this level
+!/META-INF/
+!/lib/
+!/src/
+!/README.md
+!/build.properties
+!/plugin.xml
+

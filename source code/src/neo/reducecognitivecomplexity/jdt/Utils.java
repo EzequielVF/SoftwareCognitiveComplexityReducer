@@ -11,6 +11,7 @@ import java.util.function.Predicate;
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IMarker;
 import org.eclipse.core.resources.IResource;
+import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IWorkspace;
 import org.eclipse.core.resources.IncrementalProjectBuilder;
 import org.eclipse.core.resources.ResourcesPlugin;
@@ -63,20 +64,138 @@ public class Utils {
 	 * @return The {@link org.eclipse.jdt.core.dom.CompilationUnit CompilationUnit}
 	 *         associated to the file.
 	 */
-	public static CompilationUnit createCompilationUnitFromFileInWorkspace(String pathToFileInWorkspace) {
-		IWorkspace workspace = ResourcesPlugin.getWorkspace();
-		IPath path = Path.fromOSString(pathToFileInWorkspace);
-		IFile file = workspace.getRoot().getFile(path);
-		ICompilationUnit element = JavaCore.createCompilationUnitFrom(file);
-		ASTParser parser = ASTParser.newParser(AST.getJLSLatest());
-		parser.setResolveBindings(true);
-		parser.setKind(ASTParser.K_COMPILATION_UNIT);
-		parser.setBindingsRecovery(true);
-		parser.setSource(element);
-		CompilationUnit astRoot = (CompilationUnit) parser.createAST(null);
+    public static CompilationUnit createCompilationUnitFromFileInWorkspace(String pathToFileInWorkspace) {
+        IWorkspace workspace = ResourcesPlugin.getWorkspace();
+        // Normalize to workspace-absolute path: "/<project>/<relative>"
+        String p = pathToFileInWorkspace.replace('\\', '/');
+        if (!p.startsWith("/")) {
+            p = "/" + p;
+        }
+        IPath wsPath = new Path(p);
 
-		return astRoot;
-	}
+        IFile file = workspace.getRoot().getFile(wsPath);
+        IProject project = file.getProject();
+        try {
+            if (project != null && !project.isOpen()) {
+                project.open(null);
+            }
+            if (project != null) {
+                project.refreshLocal(IResource.DEPTH_INFINITE, null);
+            }
+            if (!file.exists() && project != null) {
+                // Try resolving relative to the project directly
+                IPath rel = wsPath.removeFirstSegments(1);
+                file = project.getFile(rel);
+            }
+        } catch (CoreException e) {
+            // ignore and try fallbacks below
+        }
+
+        try {
+            if (file.exists()) {
+                ICompilationUnit element = JavaCore.createCompilationUnitFrom(file);
+                if (element != null) {
+                    try { element.open(null); } catch (Exception e) { /* ignore */ }
+                    ASTParser parser = ASTParser.newParser(AST.getJLSLatest());
+                    parser.setResolveBindings(true);
+                    parser.setKind(ASTParser.K_COMPILATION_UNIT);
+                    parser.setBindingsRecovery(true);
+                    parser.setSource(element);
+                    CompilationUnit astRoot = (CompilationUnit) parser.createAST(null);
+                    return astRoot;
+                }
+            }
+        } catch (Exception e) {
+            // fall through to file-based parsing
+        }
+
+        // Fallback: parse from absolute file on disk if available (same project)
+        if (project != null && project.getLocation() != null) {
+            IPath relInProject = wsPath.removeFirstSegments(1);
+            IPath abs = project.getLocation().append(relInProject);
+            java.nio.file.Path nio = java.nio.file.Paths.get(abs.toOSString());
+            try {
+                project.refreshLocal(IResource.DEPTH_INFINITE, null);
+            } catch (CoreException ignore) { }
+            if (java.nio.file.Files.exists(nio)) {
+                try {
+                    IFile f2 = project.getFile(relInProject);
+                    ICompilationUnit element2 = JavaCore.createCompilationUnitFrom(f2);
+                    if (element2 != null) {
+                        try { element2.open(null); } catch (Exception e) { /* ignore */ }
+                        ASTParser parser2 = ASTParser.newParser(AST.getJLSLatest());
+                        parser2.setResolveBindings(true);
+                        parser2.setKind(ASTParser.K_COMPILATION_UNIT);
+                        parser2.setBindingsRecovery(true);
+                        parser2.setSource(element2);
+                        CompilationUnit ast2 = (CompilationUnit) parser2.createAST(null);
+                        System.out.println("[ReduceCC] Fallback (same project) IFile parsed: " + abs.toOSString());
+                        return ast2;
+                    }
+                } catch (Exception ignore) {
+                }
+                // As a weaker fallback, parse from disk
+                CompilationUnit ast = createCompilationUnitFromFile(abs.toOSString());
+                if (ast != null) {
+                    System.out.println("[ReduceCC] Fallback (same project) parsed file: " + abs.toOSString());
+                    return ast;
+                }
+            }
+        }
+
+        // Fallback 2: search the file under any open project in workspace
+        try {
+            for (IProject pjt : workspace.getRoot().getProjects()) {
+                try {
+                    if (pjt != null && !pjt.isOpen()) {
+                        pjt.open(null);
+                    }
+                    if (pjt != null && pjt.getLocation() != null) {
+                        IPath rel = wsPath.removeFirstSegments(1); // strip leading project segment if any
+                        IPath cand = pjt.getLocation().append(rel);
+                        java.nio.file.Path nio = java.nio.file.Paths.get(cand.toOSString());
+                        if (java.nio.file.Files.exists(nio)) {
+                            try {
+                                IPath relInP = cand.removeFirstSegments(pjt.getLocation().segmentCount());
+                                IFile f2 = pjt.getFile(relInP);
+                                pjt.refreshLocal(IResource.DEPTH_INFINITE, null);
+                                if (f2.exists()) {
+                                    ICompilationUnit element2 = JavaCore.createCompilationUnitFrom(f2);
+                                    if (element2 != null) {
+                                        try { element2.open(null); } catch (Exception e) { /* ignore */ }
+                                        ASTParser parser2 = ASTParser.newParser(AST.getJLSLatest());
+                                        parser2.setResolveBindings(true);
+                                        parser2.setKind(ASTParser.K_COMPILATION_UNIT);
+                                        parser2.setBindingsRecovery(true);
+                                        parser2.setSource(element2);
+                                        CompilationUnit ast2 = (CompilationUnit) parser2.createAST(null);
+                                        System.out.println("[ReduceCC] Fallback (search projects) IFile parsed: " + f2.getFullPath());
+                                        return ast2;
+                                    }
+                                }
+                            } catch (Exception ignore) {
+                                // If any issue, parse from disk
+                            }
+                            CompilationUnit ast = createCompilationUnitFromFile(cand.toOSString());
+                            if (ast != null) {
+                                System.out.println("[ReduceCC] Fallback (search projects) parsed file: " + cand.toOSString());
+                                return ast;
+                            }
+                        }
+                    }
+                } catch (Exception ignore) {
+                    // keep trying other projects
+                }
+            }
+        } catch (Exception ignore) {
+            // ignore
+        }
+
+        // As a last resort, return an empty AST to avoid NPEs downstream
+        ASTParser parser = ASTParser.newParser(AST.getJLSLatest());
+        parser.setSource(new char[0]);
+        return (CompilationUnit) parser.createAST(null);
+    }
 	
 	/**
 	 * Create a {@link org.eclipse.jdt.core.dom.CompilationUnit CompilationUnit}

@@ -59,7 +59,8 @@ public class Application implements IApplication {
 		String algorithmName = args[4];
 
 		try {
-			// creating and adding information to the results file
+			// ensure output folder exists, then create and add information to the results file
+			new File(Constants.OUTPUT_FOLDER).mkdirs();
 			BufferedWriter bf = new BufferedWriter(new FileWriter(Constants.OUTPUT_FOLDER
 					+ projectNameInWorkspace.replace('/', '.') + "-" + algorithmName + "-" + Constants.FILE, false));
 			bf.append("algorithm;class;method;initialComplexity;solution;extractions;fitness;"
@@ -102,8 +103,12 @@ public class Application implements IApplication {
 				for (String classWithIssues : methodsWithIssues.keySet()) {
 					classWithIssuesCounter++;
 
-					// Get the relative path of current class in project in workspace
-					String relativePathForFileToProcess = projectNameInWorkspace + File.separator + classWithIssues;
+			// Build workspace-absolute path (Eclipse resource path) for the file
+			String normalizedClassPath = classWithIssues.replace('\\', '/');
+			if (normalizedClassPath.startsWith("/")) {
+				normalizedClassPath = normalizedClassPath.substring(1);
+			}
+			String relativePathForFileToProcess = "/" + projectNameInWorkspace + "/" + normalizedClassPath;
 
 					List<Solution> solutions = new ArrayList<>();
 
@@ -111,11 +116,12 @@ public class Application implements IApplication {
 					CompilationUnit compilationUnit = Utils
 							.createCompilationUnitFromFileInWorkspace(relativePathForFileToProcess);
 
-					// Validate if compilation unit is accessible and valid
-					if (compilationUnit.getLength() == 0) {
-						LOGGER.warning("ERROR WITH COMPILATION UNIT: " + compilationUnit.getTypeRoot().toString());
-						LOGGER.warning(relativePathForFileToProcess);
-					} else {
+				// Validate if compilation unit is accessible and valid
+				if (compilationUnit == null || compilationUnit.getLength() == 0) {
+					LOGGER.warning("ERROR WITH COMPILATION UNIT (empty AST). File: " + relativePathForFileToProcess);
+				} else if (compilationUnit.getTypeRoot() == null) {
+					LOGGER.warning("WARN: TypeRoot is null (parsed from file). Proceeding. File: " + relativePathForFileToProcess);
+				} else {
 						int methodsWithIssuesInClassCounter = 0;
 
 						// Iterate over cognitive complex methods in current class

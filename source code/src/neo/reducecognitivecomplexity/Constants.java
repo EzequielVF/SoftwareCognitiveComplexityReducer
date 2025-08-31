@@ -19,7 +19,10 @@ public class Constants {
 	public static final String TEXT_RANGE = "textRange";
 
 	public static final String COMPLEXITY_WHEN_EXTRACTING = "complexityWhenExtracting";
-	public static final String OUTPUT_FOLDER = "/Users/rsain/Research/CognitiveComplexity/experiments/";
+	// Output folder for generated reports. You can override with -Dreducecc.output=<path>
+	public static final String OUTPUT_FOLDER = System.getProperty(
+			"reducecc.output",
+			System.getProperty("user.home").replace('\\', '/') + "/ReduceCognitiveComplexity/experiments/");
 	public static final String FILE = "results.txt";
 	public static final String FILE_VALIDATION = "validation-results.txt";
 

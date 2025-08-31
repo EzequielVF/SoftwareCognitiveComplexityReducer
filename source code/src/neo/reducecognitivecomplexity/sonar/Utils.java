@@ -174,9 +174,10 @@ public class Utils {
 	 *         project
 	 */
 	public static String composeSonarUri(String server, String project, int page) {
-		String result = new String(server + "/api/issues/search?rules=squid:S3776" + "&componentKeys=" + project
+		String result = new String(server + "/api/issues/search?rules=java:S3776" + "&componentKeys=" + project
 				+ "&resolved=false" + "&p=" + page + "&pageSize=100");
 
 		return result;
 	}
 }
+
